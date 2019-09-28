@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -73,19 +73,19 @@ extern std::vector<DIFFERNET_FILE_SET_HOSTS> *HostsFileSetUsing, *HostsFileSetMo
 extern std::mutex IPFilterFileLock, HostsFileLock;
 
 //Functions in Configuration.cpp
-bool ReadText(
+bool ReadSupport_ReadText(
 	const FILE * const FileHandle, 
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex);
-bool ReadFileAttributesLoop(
+bool ReadSupport_FileAttributesLoop(
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
-	FILE_DATA &FileListIter, 
+	FILE_DATA &FileListItem, 
 	bool &IsFileModified);
 void ClearModificatingListData(
 	const READ_TEXT_TYPE ClearType, 
 	const size_t FileIndex);
-void GetParameterListData(
+void ReadSupport_GetParameterListData(
 	std::vector<std::string> &ListData, 
 	const std::string &Data, 
 	const size_t DataOffset, 
@@ -178,7 +178,7 @@ bool ReadParameterData_Proxy(
 	CONFIGURATION_TABLE * const ParameterPointer, 
 	bool &IsFoundParameter);
 #if defined(ENABLE_LIBSODIUM)
-bool ReadParameterData_DNSCurve(
+bool ReadParameterData_DNSCurve_Main(
 	const std::string &Data, 
 	const size_t FileIndex, 
 	const bool IsFirstRead, 
@@ -210,7 +210,7 @@ bool ReadParameterData_DNSCurve_Keys(
 //	CONFIGURATION_TABLE * const ParameterPointer, 
 	DNSCURVE_CONFIGURATION_TABLE * const DNSCurveParameterPointer, 
 	bool &IsFoundParameter);
-bool ReadParameterData_DNSCurve_Magic_Number(
+bool ReadParameterData_DNSCurve_MagicNumber(
 	const std::string &Data, 
 	const size_t FileIndex, 
 //	const bool IsFirstRead, 
@@ -219,17 +219,17 @@ bool ReadParameterData_DNSCurve_Magic_Number(
 	DNSCURVE_CONFIGURATION_TABLE * const DNSCurveParameterPointer, 
 	bool &IsFoundParameter);
 #endif
-bool ReadName_PathFile(
+bool ReadSupport_PathFileName(
 	std::string Data, 
 	const size_t DataOffset, 
 	const bool IsPath, 
 	std::vector<std::wstring> * const ListData, 
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	std::vector<std::string> * const MBS_ListData, 
+#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	std::vector<std::string> * const ListData_MBS, 
 #endif
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadMultipleAddresses(
+bool ReadSupport_MultipleAddresses(
 	const uint16_t Protocol, 
 	std::string Data, 
 	const size_t DataOffset, 
@@ -237,14 +237,14 @@ bool ReadMultipleAddresses(
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool Read_SOCKS_AddressDomain(
+bool ReadSupport_SOCKS_AddressDomain(
 	std::string Data, 
 	const size_t DataOffset, 
 	CONFIGURATION_TABLE * const ParameterPointer, 
 	const size_t FileIndex, 
 	const size_t Line);
 #if defined(ENABLE_PCAP)
-bool ReadHopLimitsData(
+bool ReadSupport_HopLimitsData(
 	const uint16_t Protocol, 
 	std::string Data, 
 	const size_t DataOffset, 
@@ -253,22 +253,30 @@ bool ReadHopLimitsData(
 	const size_t FileIndex, 
 	const size_t Line);
 #endif
+bool ReadSupport_AddressPrefixData(
+	const uint16_t Protocol, 
+	std::string OriginalData, 
+	const size_t DataOffset, 
+	ADDRESS_PREFIX_BLOCK * const AddressPrefix, 
+	const std::vector<FILE_DATA> &FileList, 
+	const size_t FileIndex, 
+	const size_t Line);
 #if defined(ENABLE_LIBSODIUM)
-void ReadDNSCurveDatabaseData(
+void ReadSupport_DNSCurveDatabaseData(
 	std::string Data, 
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadDNSCurveDatabaseItem(
+bool ReadSupport_DNSCurveDatabaseItem(
 	const READ_TEXT_TYPE InputType);
-bool ReadDNSCurveProviderName(
+bool ReadSupport_DNSCurveProviderName(
 	std::string Data, 
 	const size_t DataOffset, 
 	uint8_t * const ProviderNameData, 
 	const READ_TEXT_TYPE InputType, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadDNSCurveKey(
+bool ReadSupport_DNSCurveKey(
 	std::string Data, 
 	const size_t DataOffset, 
 	uint8_t * const KeyData, 
@@ -276,7 +284,7 @@ bool ReadDNSCurveKey(
 	const size_t FileIndex, 
 	const size_t Line);
 #endif
-bool ReadDNSCurveMagicNumber(
+bool ReadSupport_DNSCurveMagicNumber(
 	std::string Data, 
 	const size_t DataOffset, 
 	uint8_t * const MagicNumber, 
@@ -290,23 +298,15 @@ bool ReadIPFilterData(
 	const size_t Line, 
 	LABEL_IPFILTER_TYPE &LabelType, 
 	bool &IsStopLabel);
-bool ReadBlacklistData(
+bool ReadIPFilter_BlacklistData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadLocalRoutingData(
+bool ReadIPFilter_LocalRoutingData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadAddressPrefixBlock(
-	const uint16_t Protocol, 
-	std::string OriginalData, 
-	const size_t DataOffset, 
-	ADDRESS_PREFIX_BLOCK * const AddressPrefix, 
-	const std::vector<FILE_DATA> &FileList, 
-	const size_t FileIndex, 
-	const size_t Line);
-bool ReadMainIPFilterData(
+bool ReadIPFilter_MainData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line);
@@ -318,21 +318,21 @@ bool ReadHostsData(
 	const size_t Line, 
 	LABEL_HOSTS_TYPE &LabelType, 
 	bool &IsStopLabel);
-bool ReadOtherHostsData(
+bool ReadHosts_OtherData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line, 
 	const LABEL_HOSTS_TYPE LabelType, 
 	const LABEL_HOSTS_TYPE ItemType);
-bool ReadLocalHostsData(
+bool ReadHosts_LocalData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadAddressHostsData(
+bool ReadHosts_AddressData(
 	std::string Data, 
 	const size_t FileIndex, 
 	const size_t Line);
-bool ReadMainHostsData(
+bool ReadHosts_MainData(
 	std::string Data, 
 	const HOSTS_TYPE HostsType, 
 	const size_t FileIndex, 

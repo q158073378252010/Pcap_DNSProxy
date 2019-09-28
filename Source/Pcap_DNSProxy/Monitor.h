@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,23 +30,24 @@ extern ALTERNATE_SWAP_TABLE AlternateSwapList;
 extern DNSCURVE_CONFIGURATION_TABLE DNSCurveParameter, DNSCurveParameterModificating;
 #endif
 extern std::deque<SOCKET_REGISTER_DATA> SocketRegisterList;
-extern std::mutex LocalAddressLock[], SocketRegisterLock;
+extern std::mutex SocketRegisterLock;
+extern std::array<std::mutex, NETWORK_LAYER_PARTNUM> LocalAddressLock;
 
 //Functions
-bool MonitorSocketBinding(
+bool ListenMonitor_BindSocket(
 	const uint16_t Protocol, 
 	SOCKET_DATA &LocalSocketData);
-bool UDP_Monitor(
+bool ListenMonitor_UDP(
 	SOCKET_DATA LocalSocketData);
-bool TCP_Monitor(
+bool ListenMonitor_TCP(
 	SOCKET_DATA LocalSocketData);
-void AlternateServerMonitor(
+void AlternateServerSwitcher(
 	void);
 #if defined(PLATFORM_WIN)
 addrinfo *GetLocalAddressList(
 	const uint16_t Protocol, 
 	uint8_t * const HostName);
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 bool GetBestInterfaceAddress(
 	const uint16_t Protocol, 
 	const sockaddr_storage * const OriginalSockAddr);

@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,10 +30,10 @@ extern ALTERNATE_SWAP_TABLE AlternateSwapList;
 extern DNSCURVE_CONFIGURATION_TABLE DNSCurveParameter;
 
 //Functions
-bool DNSCurve_TCP_SignatureRequest(
+bool DNSCurve_SignatureRequest_TCP(
 	const uint16_t Protocol, 
 	const bool IsAlternate);
-bool DNSCurve_UDP_SignatureRequest(
+bool DNSCurve_SignatureRequest_UDP(
 	const uint16_t Protocol, 
 	const bool IsAlternate);
 #endif

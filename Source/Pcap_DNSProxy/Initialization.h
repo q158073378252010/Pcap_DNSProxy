@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -34,8 +34,10 @@ std::vector<FILE_DATA> FileList_Config, FileList_IPFilter, FileList_Hosts;
 #if defined(ENABLE_LIBSODIUM)
 std::vector<FILE_DATA> FileList_DNSCurveDatabase;
 #endif
-std::vector<DIFFERNET_FILE_SET_IPFILTER> IPFilterFileSet[DIFFERNET_FILE_SET_NUM], *IPFilterFileSetUsing = &IPFilterFileSet[0], *IPFilterFileSetModificating = &IPFilterFileSet[1U];
-std::vector<DIFFERNET_FILE_SET_HOSTS> HostsFileSet[DIFFERNET_FILE_SET_NUM], *HostsFileSetUsing = &HostsFileSet[0], *HostsFileSetModificating = &HostsFileSet[1U];
+std::array<std::vector<DIFFERNET_FILE_SET_IPFILTER>, DIFFERNET_FILE_SET_NUM> IPFilterFileSet;
+std::vector<DIFFERNET_FILE_SET_IPFILTER> *IPFilterFileSetUsing = &IPFilterFileSet.at(0), *IPFilterFileSetModificating = &IPFilterFileSet.at(1U);
+std::array<std::vector<DIFFERNET_FILE_SET_HOSTS>, DIFFERNET_FILE_SET_NUM> HostsFileSet;
+std::vector<DIFFERNET_FILE_SET_HOSTS> *HostsFileSetUsing = &HostsFileSet.at(0), *HostsFileSetModificating = &HostsFileSet.at(1U);
 std::deque<SOCKET_REGISTER_DATA> SocketRegisterList;
 #if defined(ENABLE_PCAP)
 std::deque<OUTPUT_PACKET_TABLE> OutputPacketList;
@@ -43,7 +45,8 @@ std::mutex CaptureLock, OutputPacketListLock;
 #endif
 std::list<DNS_CACHE_DATA> DNSCacheList;
 std::unordered_multimap<std::string, std::list<DNS_CACHE_DATA>::iterator> DNSCacheIndexList;
-std::mutex ScreenLock, LocalAddressLock[NETWORK_LAYER_PARTNUM], SocketRegisterLock, DNSCacheListLock, IPFilterFileLock, HostsFileLock;
+std::mutex ScreenLock, SocketRegisterLock, DNSCacheListLock, IPFilterFileLock, HostsFileLock;
+std::array<std::mutex, NETWORK_LAYER_PARTNUM> LocalAddressLock;
 
 //Functions
 void ConfigurationTableSetting(

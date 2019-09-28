@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@
 bool ReadCommand(
 	int argc, 
 	wchar_t *argv[])
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 bool ReadCommand(
 	int argc, 
 	char *argv[])
@@ -36,30 +36,30 @@ bool ReadCommand(
 	wmemset(FilePathBuffer.get(), 0, FILE_BUFFER_SIZE + MEMORY_RESERVED_BYTES);
 	std::wstring FilePathString;
 	size_t BufferSize = FILE_BUFFER_SIZE;
-	for (;;)
+	while (!GlobalRunningStatus.IsNeedExit)
 	{
 	//Get full module file name which is the location of program and not its working directory.
-		const auto Result = GetModuleFileNameW(
+		const auto ResultValue = GetModuleFileNameW(
 			nullptr, 
 			FilePathBuffer.get(), 
-			static_cast<DWORD>(BufferSize));
-		if (Result == 0)
+			static_cast<const DWORD>(BufferSize));
+		if (ResultValue == 0)
 		{
 			std::wstring Message(L"[System Error] Path initialization error");
 			if (GetLastError() == 0)
 			{
 				Message.append(L".\n");
-				PrintToScreen(true, Message.c_str());
+				PrintToScreen(true, false, Message.c_str());
 			}
 			else {
 				ErrorCodeToMessage(LOG_ERROR_TYPE::SYSTEM, GetLastError(), Message);
 				Message.append(L".\n");
-				PrintToScreen(true, Message.c_str(), GetLastError());
+				PrintToScreen(true, false, Message.c_str(), GetLastError());
 			}
 
 			return false;
 		}
-		else if (Result == BufferSize)
+		else if (ResultValue == BufferSize)
 		{
 		//Buffer is too small to hold the module name.
 		#if defined(PLATFORM_WIN_XP)
@@ -88,12 +88,12 @@ bool ReadCommand(
 
 //File name initialization
 	FilePathBuffer.reset();
-	if (!FileNameInit(FilePathString))
+	if (!FileNameInit(FilePathString, true, false))
 	{
-		PrintToScreen(true, L"[System Error] Path initialization error.\n");
+		PrintToScreen(true, false, L"[System Error] Path initialization error.\n");
 		return false;
 	}
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 	auto FilePath = getcwd(nullptr, 0);
 	if (FilePath == nullptr)
 	{
@@ -101,12 +101,12 @@ bool ReadCommand(
 		if (errno == 0)
 		{
 			Message.append(L".\n");
-			PrintToScreen(true, Message.c_str());
+			PrintToScreen(true, false, Message.c_str());
 		}
 		else {
 			ErrorCodeToMessage(LOG_ERROR_TYPE::SYSTEM, errno, Message);
 			Message.append(L".\n");
-			PrintToScreen(true, Message.c_str(), errno);
+			PrintToScreen(true, false, Message.c_str(), errno);
 		}
 
 		return false;
@@ -123,10 +123,10 @@ bool ReadCommand(
 	// with the string "(unreachable)".
 		if (FilePathString.back() != ASCII_SLASH)
 			FilePathString.append("/");
-		if (FilePathString.compare(0, strlen("(unreachable)"), ("(unreachable)")) == 0 || 
-			!FileNameInit(FilePathString))
+		if (FilePathString.compare(0, strlen("(unreachable)"), "(unreachable)") == 0 || 
+			!FileNameInit(FilePathString, true, false))
 		{
-			PrintToScreen(true, L"[System Error] Path initialization error.\n");
+			PrintToScreen(true, false, L"[System Error] Path initialization error.\n");
 			return false;
 		}
 	}
@@ -147,6 +147,7 @@ bool ReadCommand(
 	if (WSAStartup(
 			MAKEWORD(WINSOCK_VERSION_HIGH_BYTE, WINSOCK_VERSION_LOW_BYTE), 
 			&WSAInitialization) != 0 || 
+	//Winsock 2.2
 		LOBYTE(WSAInitialization.wVersion) != WINSOCK_VERSION_LOW_BYTE || 
 		HIBYTE(WSAInitialization.wVersion) != WINSOCK_VERSION_HIGH_BYTE)
 	{
@@ -159,12 +160,13 @@ bool ReadCommand(
 #endif
 
 //Read commands.
-	for (size_t Index = 1U;static_cast<int>(Index) < argc;++Index)
+	auto IsRewriteLogFile = false;
+	for (size_t Index = 1U;static_cast<const int>(Index) < argc;++Index)
 	{
 	//Case insensitive
 	#if defined(PLATFORM_WIN)
 		std::wstring Commands(argv[Index]), InsensitiveString(argv[Index]);
-	#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 		std::string Commands(argv[Index]), InsensitiveString(argv[Index]);
 	#endif
 		CaseConvert(InsensitiveString, false);
@@ -173,7 +175,7 @@ bool ReadCommand(
 		if (InsensitiveString == COMMAND_LONG_SET_PATH || InsensitiveString == COMMAND_SHORT_SET_PATH)
 		{
 		//Commands check
-			if (static_cast<int>(Index) + 1 >= argc)
+			if (static_cast<const int>(Index) + 1 >= argc)
 			{
 				PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
 				return false;
@@ -194,7 +196,7 @@ bool ReadCommand(
 				{
 					Commands.append(L"\\");
 				}
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 				if (Commands.length() >= PATH_MAX || Commands.find("//") != std::string::npos)
 				{
 					PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
@@ -207,9 +209,9 @@ bool ReadCommand(
 			#endif
 
 			//Mark path and file name.
-				if (!FileNameInit(Commands))
+				if (!FileNameInit(Commands, false, IsRewriteLogFile))
 				{
-					PrintToScreen(true, L"[System Error] Path initialization error.\n");
+					PrintToScreen(true, false, L"[System Error] Path initialization error.\n");
 					return false;
 				}
 			}
@@ -218,73 +220,126 @@ bool ReadCommand(
 		else if (InsensitiveString == COMMAND_LONG_HELP || InsensitiveString == COMMAND_SHORT_HELP)
 		{
 			std::lock_guard<std::mutex> ScreenMutex(ScreenLock);
-			PrintToScreen(false, L"Pcap_DNSProxy ");
-			PrintToScreen(false, FULL_VERSION);
-		#if defined(PLATFORM_WIN)
-			PrintToScreen(false, L"(Windows)\n");
+			PrintToScreen(false, false, L"Pcap_DNSProxy ");
+			PrintToScreen(false, false, FULL_VERSION);
+		#if defined(PLATFORM_FREEBSD)
+			PrintToScreen(false, false, L"(FreeBSD)\n");
 		#elif defined(PLATFORM_OPENWRT)
-			PrintToScreen(false, L"(OpenWrt)\n");
+			PrintToScreen(false, false, L"(OpenWrt)\n");
 		#elif defined(PLATFORM_LINUX)
-			PrintToScreen(false, L"(Linux)\n");
+			PrintToScreen(false, false, L"(Linux)\n");
 		#elif defined(PLATFORM_MACOS)
-			PrintToScreen(false, L"(macOS)\n");
+			PrintToScreen(false, false, L"(macOS)\n");
+		#elif defined(PLATFORM_WIN)
+			PrintToScreen(false, false, L"(Windows)\n");
 		#endif
-			PrintToScreen(false, COPYRIGHT_MESSAGE);
-			PrintToScreen(false, L"\nUsage: Please visit ReadMe.. files in Documents folder.\n");
-			PrintToScreen(false, L"   -v/--version:          Print current version on screen.\n");
-			PrintToScreen(false, L"   --lib-version:         Print current version of libraries on screen.\n");
-			PrintToScreen(false, L"   -h/--help:             Print help messages on screen.\n");
-			PrintToScreen(false, L"   --flush-dns:           Flush all DNS cache in program and system immediately.\n");
-			PrintToScreen(false, L"   --flush-dns Domain:    Flush cache of Domain in program and all in system immediately.\n");
+			PrintToScreen(false, false, COPYRIGHT_MESSAGE);
+			PrintToScreen(false, false, L"\nUsage: Please visit ReadMe.. files in Documents folder.\n");
+			PrintToScreen(false, false, L"   --version:             Print current version on screen.\n");
+			PrintToScreen(false, false, L"   --lib-version:         Print current version of libraries on screen.\n");
+			PrintToScreen(false, false, L"   --help:                Print help messages on screen.\n");
+			PrintToScreen(false, false, L"   --log-file Path+Name:  Set path and name of log file.\n");
+			PrintToScreen(false, false, L"   --log-file stderr/out: Set output log to stderr or stdout.\n");
+			PrintToScreen(false, false, L"   --flush-dns:           Flush all domain cache in program and system immediately.\n");
+			PrintToScreen(false, false, L"   --flush-dns Domain:    Flush cache of Domain in program and all in system immediately.\n");
 		#if defined(PLATFORM_WIN)
-			PrintToScreen(false, L"   --first-setup:         Test local firewall.\n");
+			PrintToScreen(false, false, L"   --first-setup:         Test local firewall.\n");
 		#endif
-			PrintToScreen(false, L"   -c/--config-file Path: Set path of configuration file.\n");
-			PrintToScreen(false, L"   --keypair-generator:   Generate a DNSCurve(DNSCrypt) keypair.\n");
-		#if defined(PLATFORM_LINUX)
-			PrintToScreen(false, L"   --disable-daemon:      Disable daemon mode.\n");
+			PrintToScreen(false, false, L"   --config-path Path:    Set path of configuration file.\n");
+			PrintToScreen(false, false, L"   --keypair-generator:   Generate a DNSCurve(DNSCrypt) keypair.\n");
+		#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX))
+			PrintToScreen(false, false, L"   --disable-daemon:      Disable daemon mode.\n");
 		#endif
 
 			return false;
+		}
+	//Set log file location from commands.
+		else if (InsensitiveString == COMMAND_LONG_LOG_FILE || InsensitiveString == COMMAND_SHORT_LOG_FILE)
+		{
+		//Commands check
+			if (static_cast<const int>(Index) + 1 >= argc)
+			{
+				PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
+				return false;
+			}
+			else {
+				++Index;
+				Commands = argv[Index];
+
+			//Path, file name check and ddd backslash or slash to the end.
+			//Path and file name size limit is removed, visit https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx to get more details.
+			#if defined(PLATFORM_WIN)
+				if (Commands.find(L"\\\\") != std::string::npos)
+				{
+					PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
+					return false;
+				}
+			#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+				if (Commands.length() >= PATH_MAX + NAME_MAX || Commands.find("//") != std::string::npos)
+				{
+					PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
+					return false;
+				}
+			#endif
+
+			//Mark log path and name.
+			#if defined(PLATFORM_WIN)
+				*GlobalRunningStatus.Path_ErrorLog = Commands;
+			#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+				*GlobalRunningStatus.Path_ErrorLog_MBS = Commands;
+				std::wstring StringTemp;
+				if (!MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(Commands.c_str()), PATH_MAX + NAME_MAX + NULL_TERMINATE_LENGTH, StringTemp))
+				{
+					PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Commands error", 0, nullptr, 0);
+					return false;
+				}
+				else {
+					*GlobalRunningStatus.Path_ErrorLog = StringTemp;
+				}
+			#endif
+				IsRewriteLogFile = true;
+			}
 		}
 	//Print current version.
 		else if (InsensitiveString == COMMAND_LONG_PRINT_VERSION || InsensitiveString == COMMAND_SHORT_PRINT_VERSION)
 		{
 			std::lock_guard<std::mutex> ScreenMutex(ScreenLock);
-			PrintToScreen(false, L"Pcap_DNSProxy ");
-			PrintToScreen(false, FULL_VERSION);
-			PrintToScreen(false, L"\n");
+			PrintToScreen(false, false, L"Pcap_DNSProxy ");
+			PrintToScreen(false, false, FULL_VERSION);
+			PrintToScreen(false, false, L"\n");
 
 			return false;
 		}
-	//Flush DNS Cache from user.
-		else if (InsensitiveString == COMMAND_FLUSH_DNS)
+	//Flush domain Cache from user.
+		else if (InsensitiveString == COMMAND_FLUSH_DOMAIN_CACHE)
 		{
 		//Remove single domain cache.
 			if (argc > 2)
 			{
 			#if defined(PLATFORM_WIN)
-				if (wcsnlen_s(argv[2U], FILE_BUFFER_SIZE) <= DOMAIN_MINSIZE && wcsnlen_s(argv[2U], FILE_BUFFER_SIZE) >= DOMAIN_MAXSIZE)
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-				if (strnlen(argv[2U], FILE_BUFFER_SIZE) <= DOMAIN_MINSIZE && strnlen(argv[2U], FILE_BUFFER_SIZE) >= DOMAIN_MAXSIZE)
+				if (wcsnlen_s(argv[2U], FILE_BUFFER_SIZE) == 0 || 
+					wcsnlen_s(argv[2U], FILE_BUFFER_SIZE) + wcslen(FLUSH_DOMAIN_MAILSLOT_MESSAGE_ALL) + wcslen(L": ") >= FILE_BUFFER_SIZE)
+			#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+				if (strnlen(argv[2U], FILE_BUFFER_SIZE) == 0 || 
+					strnlen(argv[2U], FILE_BUFFER_SIZE) + strlen(FLUSH_DOMAIN_PIPE_MESSAGE_ALL) + strlen(": ") >= FILE_BUFFER_SIZE)
 			#endif
 				{
-					PrintToScreen(true, L"[Parameter Error] Domain name parameter error.\n");
+					PrintToScreen(true, false, L"[Parameter Error] Domain name parameter error.\n");
 				}
 				else {
 				#if defined(PLATFORM_WIN)
-					Flush_DNS_MailSlotSender(argv[2U]);
-				#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-					Flush_DNS_FIFO_Sender(reinterpret_cast<const uint8_t *>(argv[2U]));
+					FlushDomainCache_MailslotSender(argv[2U]);
+				#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+					FlushDomainCache_PipeSender(reinterpret_cast<const uint8_t *>(argv[2U]));
 				#endif
 				}
 			}
-		//Flush all DNS cache.
+		//Flush all domain cache.
 			else {
 			#if defined(PLATFORM_WIN)
-				Flush_DNS_MailSlotSender(nullptr);
-			#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-				Flush_DNS_FIFO_Sender(nullptr);
+				FlushDomainCache_MailslotSender(nullptr);
+			#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+				FlushDomainCache_PipeSender(nullptr);
 			#endif
 			}
 
@@ -298,8 +353,8 @@ bool ReadCommand(
 			FILE *FileHandle = nullptr;
 		#if defined(PLATFORM_WIN)
 			_wfopen_s(&FileHandle, DNSCURVE_KEY_PAIR_FILE_NAME, L"w+,ccs=UTF-8");
-		#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-			FileHandle = fopen(DNSCURVE_KEY_PAIR_FILE_NAME, ("w+"));
+		#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+			FileHandle = fopen(DNSCURVE_KEY_PAIR_FILE_NAME, "w+");
 		#endif
 
 		//Print keypair to file.
@@ -309,21 +364,21 @@ bool ReadCommand(
 				const auto Buffer = std::make_unique<uint8_t[]>(DNSCRYPT_KEYPAIR_MESSAGE_LEN + MEMORY_RESERVED_BYTES);
 				memset(Buffer.get(), 0, DNSCRYPT_KEYPAIR_MESSAGE_LEN + MEMORY_RESERVED_BYTES);
 				DNSCURVE_HEAP_BUFFER_TABLE<uint8_t> SecretKey(crypto_box_SECRETKEYBYTES);
-				uint8_t PublicKey[crypto_box_PUBLICKEYBYTES]{0};
+				std::array<uint8_t, crypto_box_PUBLICKEYBYTES> PublicKey{};
 				size_t InnerIndex = 0;
 
-			//Generate a random keypair and write public key.
+			//Generate a random keypair.
 				if (crypto_box_keypair(
-						PublicKey, 
+						PublicKey.data(), 
 						SecretKey.Buffer) != 0 || 
 					sodium_bin2hex(
 						reinterpret_cast<char *>(Buffer.get()), 
 						DNSCRYPT_KEYPAIR_MESSAGE_LEN, 
-						PublicKey, 
+						PublicKey.data(), 
 						crypto_box_PUBLICKEYBYTES) == nullptr)
 				{
 					fclose(FileHandle);
-					PrintToScreen(true, L"[System Error] Create random key pair failed, please try again.\n");
+					PrintToScreen(true, false, L"[System Error] Create random key pair failed, please try again.\n");
 
 					return false;
 				}
@@ -331,6 +386,8 @@ bool ReadCommand(
 					CaseConvert(Buffer.get(), DNSCRYPT_KEYPAIR_MESSAGE_LEN, true);
 					fwprintf_s(FileHandle, L"Client Public Key = ");
 				}
+
+			//Write public key.
 				for (InnerIndex = 0;InnerIndex < strnlen_s(reinterpret_cast<const char *>(Buffer.get()), DNSCRYPT_KEYPAIR_MESSAGE_LEN);++InnerIndex)
 				{
 					if (InnerIndex > 0 && InnerIndex % DNSCRYPT_KEYPAIR_INTERVAL == 0 && 
@@ -339,10 +396,12 @@ bool ReadCommand(
 
 					fwprintf_s(FileHandle, L"%c", Buffer.get()[InnerIndex]);
 				}
+
+			//Reset buffer.
 				memset(Buffer.get(), 0, DNSCRYPT_KEYPAIR_MESSAGE_LEN);
 				fwprintf_s(FileHandle, L"\n");
 
-			//Write secret key.
+			//Convert secret key.
 				if (sodium_bin2hex(
 						reinterpret_cast<char *>(Buffer.get()), 
 						DNSCRYPT_KEYPAIR_MESSAGE_LEN, 
@@ -350,7 +409,7 @@ bool ReadCommand(
 						crypto_box_SECRETKEYBYTES) == nullptr)
 				{
 					fclose(FileHandle);
-					PrintToScreen(true, L"[System Error] Create random key pair failed, please try again.\n");
+					PrintToScreen(true, false, L"[System Error] Create random key pair failed, please try again.\n");
 
 					return false;
 				}
@@ -358,6 +417,8 @@ bool ReadCommand(
 					CaseConvert(Buffer.get(), DNSCRYPT_KEYPAIR_MESSAGE_LEN, true);
 					fwprintf_s(FileHandle, L"Client Secret Key = ");
 				}
+
+			//Write secret key.
 				for (InnerIndex = 0;InnerIndex < strnlen_s(reinterpret_cast<const char *>(Buffer.get()), DNSCRYPT_KEYPAIR_MESSAGE_LEN);++InnerIndex)
 				{
 					if (InnerIndex > 0 && InnerIndex % DNSCRYPT_KEYPAIR_INTERVAL == 0 && 
@@ -370,13 +431,13 @@ bool ReadCommand(
 
 			//Close file.
 				fclose(FileHandle);
-				PrintToScreen(true, L"[Notice] DNSCurve(DNSCrypt) keypair generation is successful.\n");
+				PrintToScreen(true, false, L"[Notice] DNSCurve(DNSCrypt) keypair generation is successful.\n");
 			}
 			else {
-				PrintToScreen(true, L"[System Error] Cannot create target file(KeyPair.txt).\n");
+				PrintToScreen(true, false, L"[System Error] Cannot create target file(KeyPair.txt).\n");
 			}
 		#else
-			PrintToScreen(true, L"[Notice] LibSodium is disabled.\n");
+			PrintToScreen(true, false, L"[Notice] LibSodium is disabled.\n");
 		#endif
 
 			return false;
@@ -384,49 +445,53 @@ bool ReadCommand(
 	//Print library version.
 		else if (InsensitiveString == COMMAND_LIB_VERSION)
 		{
-		#if (defined(ENABLE_LIBSODIUM) || defined(ENABLE_PCAP) || defined(ENABLE_TLS))
+		//Initialization
 			std::wstring LibVersion;
 			char *VersionString = nullptr;
 
-			//LibSodium version
-			#if defined(ENABLE_LIBSODIUM)
-				VersionString = const_cast<char *>(sodium_version_string());
-				if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strlen(VersionString), LibVersion))
-					PrintToScreen(true, L"LibSodium version %ls\n", LibVersion.c_str());
-				else 
-					PrintToScreen(true, L"[System Error] Convert multiple byte or wide char string error.\n");
-			#endif
+		//LibEvent version
+			VersionString = const_cast<char *>(event_get_version());
+			if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strlen(VersionString), LibVersion))
+				PrintToScreen(true, false, L"LibEvent version %ls\n", LibVersion.c_str());
+			else 
+				PrintToScreen(true, false, L"[System Error] Convert multiple byte or wide char string error.\n");
 
-			//WinPcap or LibPcap version
-			#if defined(ENABLE_PCAP)
-				VersionString = const_cast<char *>(pcap_lib_version());
-				if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strlen(VersionString), LibVersion))
-					PrintToScreen(true, L"%ls\n", LibVersion.c_str());
-				else 
-					PrintToScreen(true, L"[System Error] Convert multiple byte or wide char string error.\n");
-			#endif
+		//LibSodium version
+		#if defined(ENABLE_LIBSODIUM)
+			VersionString = const_cast<char *>(sodium_version_string());
+			if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strlen(VersionString), LibVersion))
+				PrintToScreen(true, false, L"LibSodium version %ls\n", LibVersion.c_str());
+			else 
+				PrintToScreen(true, false, L"[System Error] Convert multiple byte or wide char string error.\n");
+		#endif
 
-			//OpenSSL version
-			#if defined(ENABLE_TLS)
-			#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-			#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_1_1_0 //OpenSSL version 1.1.0 and above
-				VersionString = const_cast<char *>(OpenSSL_version(OPENSSL_VERSION));
-			#else //OpenSSL version below 1.1.0
-				VersionString = const_cast<char *>(SSLeay_version(SSLEAY_VERSION));
-			#endif
-				if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strnlen(VersionString, OPENSSL_STATIC_BUFFER_SIZE), LibVersion))
-					PrintToScreen(true, L"%ls\n", LibVersion.c_str());
-				else 
-					PrintToScreen(true, L"[System Error] Convert multiple byte or wide char string error.\n");
-			#endif
-			#endif
-		#else
-			PrintToScreen(true, L"[Notice] No any available libraries.\n");
+		//WinPcap or LibPcap version
+		#if defined(ENABLE_PCAP)
+			VersionString = const_cast<char *>(pcap_lib_version());
+			if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strlen(VersionString), LibVersion))
+				PrintToScreen(true, false, L"%ls\n", LibVersion.c_str());
+			else 
+				PrintToScreen(true, false, L"[System Error] Convert multiple byte or wide char string error.\n");
+		#endif
+
+		//OpenSSL version
+		#if defined(ENABLE_TLS)
+		#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_1_1_0 //OpenSSL version 1.1.0 and above
+			VersionString = const_cast<char *>(OpenSSL_version(OPENSSL_VERSION));
+		#else //OpenSSL version below 1.1.0
+			VersionString = const_cast<char *>(SSLeay_version(SSLEAY_VERSION));
+		#endif
+			if (VersionString != nullptr && MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(VersionString), strnlen(VersionString, OPENSSL_STATIC_BUFFER_SIZE), LibVersion))
+				PrintToScreen(true, false, L"%ls\n", LibVersion.c_str());
+			else 
+				PrintToScreen(true, false, L"[System Error] Convert multiple byte or wide char string error.\n");
+		#endif
 		#endif
 
 			return false;
 		}
-	#if defined(PLATFORM_LINUX)
+	#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX))
 	//Set system daemon.
 		else if (InsensitiveString == COMMAND_DISABLE_DAEMON)
 		{
@@ -440,7 +505,7 @@ bool ReadCommand(
 			if (!FirewallTest(AF_INET6, ErrorCode) && !FirewallTest(AF_INET, ErrorCode))
 				PrintError(LOG_LEVEL_TYPE::LEVEL_2, LOG_ERROR_TYPE::NETWORK, L"Firewall test error", ErrorCode, nullptr, 0);
 			else 
-				PrintToScreen(true, L"[Notice] Firewall test is successful.\n");
+				PrintToScreen(true, false, L"[Notice] Firewall test is successful.\n");
 
 			return false;
 		}
@@ -448,7 +513,7 @@ bool ReadCommand(
 	}
 
 //Set system daemon.
-#if defined(PLATFORM_LINUX)
+#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX))
 	if (GlobalRunningStatus.IsDaemon && daemon(0, 0) == RETURN_ERROR)
 	{
 		PrintError(LOG_LEVEL_TYPE::LEVEL_1, LOG_ERROR_TYPE::SYSTEM, L"Set system daemon error", 0, nullptr, 0);
@@ -460,13 +525,17 @@ bool ReadCommand(
 }
 
 //Get path of program from the main function parameter and Winsock initialization
-bool FileNameInit(
 #if defined(PLATFORM_WIN)
-	const std::wstring &OriginalPath
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	const std::string &OriginalPath
+bool FileNameInit(
+	const std::wstring &OriginalPath, 
+	const bool IsStartupLoad, 
+	const bool IsRewriteLogFile)
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+bool FileNameInit(
+	const std::string &OriginalPath, 
+	const bool IsStartupLoad, 
+	const bool IsRewriteLogFile)
 #endif
-)
 {
 #if defined(PLATFORM_WIN)
 //Path process
@@ -487,27 +556,49 @@ bool FileNameInit(
 			++Index;
 		}
 	}
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Path process
 //The path is location path with slash not including module name at the end of this process, like "/xxx/".
-	GlobalRunningStatus.MBS_Path_Global->clear();
-	GlobalRunningStatus.MBS_Path_Global->push_back(OriginalPath);
+	GlobalRunningStatus.Path_Global_MBS->clear();
+	GlobalRunningStatus.Path_Global_MBS->push_back(OriginalPath);
 	std::wstring StringTemp;
 	if (!MBS_To_WCS_String(reinterpret_cast<const uint8_t *>(OriginalPath.c_str()), PATH_MAX + NULL_TERMINATE_LENGTH, StringTemp))
 		return false;
 	GlobalRunningStatus.Path_Global->clear();
 	GlobalRunningStatus.Path_Global->push_back(StringTemp);
-	StringTemp.clear();
 #endif
 
-//Get path of error/running status log file and mark start time.
-	*GlobalRunningStatus.Path_ErrorLog = GlobalRunningStatus.Path_Global->front();
-	GlobalRunningStatus.Path_ErrorLog->append(ERROR_LOG_FILE_NAME_WCS);
+//Get path of log file.
+	if (IsStartupLoad)
+	{
+	#if defined(PLATFORM_OPENWRT)
+	//Set log file to stderr.
+		*GlobalRunningStatus.Path_ErrorLog = L"stderr";
+		*GlobalRunningStatus.Path_ErrorLog_MBS = "stderr";
+	#else
+	//Set log file to program location.
+		*GlobalRunningStatus.Path_ErrorLog = GlobalRunningStatus.Path_Global->front();
+		GlobalRunningStatus.Path_ErrorLog->append(ERROR_LOG_FILE_NAME_WCS);
+	#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		*GlobalRunningStatus.Path_ErrorLog_MBS = GlobalRunningStatus.Path_Global_MBS->front();
+		GlobalRunningStatus.Path_ErrorLog_MBS->append(ERROR_LOG_FILE_NAME_MBS);
+	#endif
+	#endif
+	}
+	else if (!IsRewriteLogFile)
+	{
+	//Set log file to program location.
+		*GlobalRunningStatus.Path_ErrorLog = GlobalRunningStatus.Path_Global->front();
+		GlobalRunningStatus.Path_ErrorLog->append(ERROR_LOG_FILE_NAME_WCS);
+	#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+		*GlobalRunningStatus.Path_ErrorLog_MBS = GlobalRunningStatus.Path_Global_MBS->front();
+		GlobalRunningStatus.Path_ErrorLog_MBS->append(ERROR_LOG_FILE_NAME_MBS);
+	#endif
+	}
+
+//Mark startup time.
 #if defined(PLATFORM_WIN)
 	GlobalRunningStatus.IsConsole = true;
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	*GlobalRunningStatus.MBS_Path_ErrorLog = GlobalRunningStatus.MBS_Path_Global->front();
-	GlobalRunningStatus.MBS_Path_ErrorLog->append(ERROR_LOG_FILE_NAME_MBS);
 #endif
 	GlobalRunningStatus.StartupTime = time(nullptr);
 	if (GlobalRunningStatus.StartupTime <= 0)

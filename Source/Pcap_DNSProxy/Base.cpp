@@ -1,6 +1,6 @@
 ﻿// This code is part of Pcap_DNSProxy
 // Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-// Copyright (C) 2012-2018 Chengr28
+// Copyright (C) 2012-2019 Chengr28
 // 
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,6 +18,46 @@
 
 
 #include "Base.h"
+
+//Check runtime library version
+bool CheckLibraryVersion(
+	void)
+{
+//LibEvent
+	if (event_get_version_number() < VERSION_REQUIRE_LIBEVENT)
+	{
+		PrintToScreen(true, false, L"[System Error] The version of LibEvent is too old.\n");
+		return false;
+	}
+
+//LibSodium
+#if defined(ENABLE_LIBSODIUM)
+	if (!(sodium_library_version_major() >= VERSION_REQUIRE_LIBSODIUM_MAJOR && sodium_library_version_minor() >= VERSION_REQUIRE_LIBSODIUM_MINOR))
+	{
+		PrintToScreen(true, false, L"[System Error] The version of LibSodium is too old.\n");
+		return false;
+	}
+#endif
+
+//WinPcap or LibPcap
+//No more WinPcap and LibPcap library linking version check.
+
+//OpenSSL
+#if defined(ENABLE_TLS)
+#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+//No more OpenSSL library linking version check in below 1.1.0.
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_1_1_0
+	if (OpenSSL_version_num() < VERSION_REQUIRE_OPENSSL)
+	{
+		PrintToScreen(true, false, L"[System Error] The version of OpenSSL is too old.\n");
+		return false;
+	}
+#endif
+#endif
+#endif
+
+	return true;
+}
 
 //Check empty buffer
 bool CheckEmptyBuffer(
@@ -56,8 +96,8 @@ bool MBS_To_WCS_String(
 		return false;
 
 //Initialization
-	const auto TargetBuffer = std::make_unique<wchar_t[]>(DataLength + MEMORY_RESERVED_BYTES);
-	wmemset(TargetBuffer.get(), 0, DataLength + MEMORY_RESERVED_BYTES);
+	const auto TargetBuffer = std::make_unique<wchar_t[]>(DataLength + NULL_TERMINATE_LENGTH + MEMORY_RESERVED_BYTES);
+	wmemset(TargetBuffer.get(), 0, DataLength + NULL_TERMINATE_LENGTH + MEMORY_RESERVED_BYTES);
 
 //Convert string.
 #if defined(PLATFORM_WIN)
@@ -67,9 +107,9 @@ bool MBS_To_WCS_String(
 			reinterpret_cast<const LPCCH>(Buffer), 
 			MBSTOWCS_NULL_TERMINATE, 
 			TargetBuffer.get(), 
-			static_cast<int>(DataLength + NULL_TERMINATE_LENGTH)) == 0)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	if (mbstowcs(TargetBuffer.get(), reinterpret_cast<const char *>(Buffer), DataLength + NULL_TERMINATE_LENGTH) == static_cast<size_t>(RETURN_ERROR))
+			static_cast<const int>(DataLength + NULL_TERMINATE_LENGTH)) == 0)
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	if (mbstowcs(TargetBuffer.get(), reinterpret_cast<const char *>(Buffer), DataLength + NULL_TERMINATE_LENGTH) == static_cast<const size_t>(RETURN_ERROR))
 #endif
 	{
 		return false;
@@ -99,8 +139,8 @@ bool WCS_To_MBS_String(
 		return false;
 
 //Initialization
-	const auto TargetBuffer = std::make_unique<wchar_t[]>(DataLength + MEMORY_RESERVED_BYTES);
-	memset(TargetBuffer.get(), 0, DataLength + MEMORY_RESERVED_BYTES);
+	const auto TargetBuffer = std::make_unique<wchar_t[]>(DataLength + NULL_TERMINATE_LENGTH + MEMORY_RESERVED_BYTES);
+	memset(TargetBuffer.get(), 0, DataLength + NULL_TERMINATE_LENGTH + MEMORY_RESERVED_BYTES);
 
 //Convert string.
 #if defined(PLATFORM_WIN)
@@ -110,11 +150,11 @@ bool WCS_To_MBS_String(
 			Buffer, 
 			WCSTOMBS_NULL_TERMINATE, 
 			reinterpret_cast<LPSTR>(TargetBuffer.get()), 
-			static_cast<int>(DataLength + NULL_TERMINATE_LENGTH), 
+			static_cast<const int>(DataLength + NULL_TERMINATE_LENGTH), 
 			nullptr, 
 			nullptr) == 0)
-#elif (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
-	if (wcstombs(reinterpret_cast<char *>(TargetBuffer.get()), Buffer, DataLength + NULL_TERMINATE_LENGTH) == static_cast<size_t>(RETURN_ERROR))
+#elif (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+	if (wcstombs(reinterpret_cast<char *>(TargetBuffer.get()), Buffer, DataLength + NULL_TERMINATE_LENGTH) == static_cast<const size_t>(RETURN_ERROR))
 #endif
 	{
 		return false;
@@ -142,10 +182,10 @@ void CaseConvert(
 		{
 		//Lowercase to uppercase
 			if (IsLowerToUpper)
-				Buffer[Index] = static_cast<uint8_t>(toupper(Buffer[Index]));
+				Buffer[Index] = static_cast<const uint8_t>(toupper(Buffer[Index]));
 		//Uppercase to lowercase
 			else 
-				Buffer[Index] = static_cast<uint8_t>(tolower(Buffer[Index]));
+				Buffer[Index] = static_cast<const uint8_t>(tolower(Buffer[Index]));
 		}
 	}
 
@@ -161,10 +201,10 @@ void CaseConvert(
 	{
 	//Lowercase to uppercase
 		if (IsLowerToUpper)
-			StringIter = static_cast<char>(toupper(StringIter));
+			StringIter = static_cast<const char>(toupper(StringIter));
 	//Uppercase to lowercase
 		else 
-			StringIter = static_cast<char>(tolower(StringIter));
+			StringIter = static_cast<const char>(tolower(StringIter));
 	}
 
 	return;
@@ -179,10 +219,10 @@ void CaseConvert(
 	{
 	//Lowercase to uppercase
 		if (IsLowerToUpper)
-			StringIter = static_cast<wchar_t>(toupper(StringIter));
+			StringIter = static_cast<const wchar_t>(toupper(StringIter));
 	//Uppercase to lowercase
 		else 
-			StringIter = static_cast<wchar_t>(tolower(StringIter));
+			StringIter = static_cast<const wchar_t>(tolower(StringIter));
 	}
 
 	return;
@@ -291,46 +331,46 @@ size_t Base64_Encode(
 		return 0;
 
 //Convert from binary to Base64.
-	size_t Index[]{0, 0, 0};
+	std::array<size_t, 3U> Index{};
 	memset(Output, 0, OutputSize);
-	for (Index[0] = Index[1U] = 0;Index[0] < Length;++Index[0])
+	for (Index.at(0) = Index.at(1U) = 0;Index.at(0) < Length;++Index.at(0))
 	{
 	//From 6/gcd(6, 8)
-		Index[2U] = Index[0] % 3U;
-		switch (Index[2U])
+		Index.at(2U) = Index.at(0) % 3U;
+		switch (Index.at(2U))
 		{
 			case 0:
 			{
-				Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index[0]] >> 2U) & 0x3F];
+				Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index.at(0)] >> 2U) & 0x3F];
 				continue;
 			}
 			case 1U:
 			{
-				Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[((Input[Index[0] - 1U] & 0x3) << 4U) + ((Input[Index[0]] >> 4U) & 0xF)];
+				Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[((Input[Index.at(0) - 1U] & 0x3) << 4U) + ((Input[Index.at(0)] >> 4U) & 0xF)];
 				continue;
 			}
 			case 2U:
 			{
-				Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[((Input[Index[0] - 1U] & 0xF) << 2U) + ((Input[Index[0]] >> 6U) & 0x3)];
-				Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[Input[Index[0]] & 0x3F];
+				Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[((Input[Index.at(0) - 1U] & 0xF) << 2U) + ((Input[Index.at(0)] >> 6U) & 0x3)];
+				Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[Input[Index.at(0)] & 0x3F];
 			}
 		}
 	}
 
 //Move back.
-	Index[0] -= 1U;
+	Index.at(0) -= 1U;
 
 //Check the last and add padding.
-	if ((Index[0] % 3U) == 0)
+	if ((Index.at(0) % 3U) == 0)
 	{
-		Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index[0]] & 0x3) << 4U];
-		Output[Index[1U]++] = BASE64_PAD;
-		Output[Index[1U]++] = BASE64_PAD;
+		Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index.at(0)] & 0x3) << 4U];
+		Output[Index.at(1U)++] = BASE64_PAD;
+		Output[Index.at(1U)++] = BASE64_PAD;
 	}
-	else if ((Index[0] % 3U) == 1U)
+	else if ((Index.at(0) % 3U) == 1U)
 	{
-		Output[Index[1U]++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index[0]] & 0xF) << 2U];
-		Output[Index[1U]++] = BASE64_PAD;
+		Output[Index.at(1U)++] = GlobalRunningStatus.Base64_EncodeTable[(Input[Index.at(0)] & 0xF) << 2U];
+		Output[Index.at(1U)++] = BASE64_PAD;
 	}
 
 	return strnlen_s(reinterpret_cast<const char *>(Output), OutputSize);
@@ -347,49 +387,49 @@ size_t Base64_Decode(
 //Initialization
 	if (Length == 0)
 		return 0;
-	size_t Index[]{0, 0, 0};
+	std::array<size_t, 3U> Index{};
 	memset(Output, 0, OutputSize);
 
 //Convert from Base64 to binary.
-	for (Index[0] = Index[1U] = 0;Index[0] < Length;++Index[0])
+	for (Index.at(0) = 0, Index.at(1U) = 0;Index.at(0) < Length;++Index.at(0))
 	{
 		int StringIter = 0;
-		Index[2U] = Index[0] % 4U;
-		if (Input[Index[0]] == static_cast<uint8_t>(BASE64_PAD))
+		Index.at(2U) = Index.at(0) % 4U;
+		if (Input[Index.at(0)] == static_cast<const uint8_t>(BASE64_PAD))
 			return strnlen_s(reinterpret_cast<const char *>(Output), OutputSize);
-		if (Input[Index[0]] < BASE64_DECODE_FIRST || Input[Index[0]] > BASE64_DECODE_LAST || 
-			(StringIter = GlobalRunningStatus.Base64_DecodeTable[Input[Index[0]] - BASE64_DECODE_FIRST]) == (-1))
+		if (Input[Index.at(0)] < BASE64_DECODE_FIRST || Input[Index.at(0)] > BASE64_DECODE_LAST || 
+			(StringIter = GlobalRunningStatus.Base64_DecodeTable[Input[Index.at(0)] - BASE64_DECODE_FIRST]) == (-1))
 				return 0;
-		switch (Index[2U])
+		switch (Index.at(2U))
 		{
 			case 0:
 			{
-				Output[Index[1U]] = static_cast<uint8_t>(StringIter << 2U);
+				Output[Index.at(1U)] = static_cast<const uint8_t>(StringIter << 2U);
 				continue;
 			}
 			case 1U:
 			{
-				Output[Index[1U]++] += (StringIter >> 4U) & 0x3;
+				Output[Index.at(1U)++] += (StringIter >> 4U) & 0x3;
 
 			//If not last char with padding
-				if (Index[0] < (Length - 3U) || Input[Length - 2U] != static_cast<uint8_t>(BASE64_PAD))
-					Output[Index[1U]] = (StringIter & 0xF) << 4U;
+				if (Index.at(0) < (Length - 3U) || Input[Length - 2U] != static_cast<const uint8_t>(BASE64_PAD))
+					Output[Index.at(1U)] = (StringIter & 0xF) << 4U;
 
 				continue;
 			}
 			case 2U:
 			{
-				Output[Index[1U]++] += (StringIter >> 2U) & 0xF;
+				Output[Index.at(1U)++] += (StringIter >> 2U) & 0xF;
 
 			//If not last char with padding
-				if (Index[0] < (Length - 2U) || Input[Length - 1U] != static_cast<uint8_t>(BASE64_PAD))
-					Output[Index[1U]] = (StringIter & 0x3) << 6U;
+				if (Index.at(0) < (Length - 2U) || Input[Length - 1U] != static_cast<const uint8_t>(BASE64_PAD))
+					Output[Index.at(1U)] = (StringIter & 0x3) << 6U;
 
 				continue;
 			}
 			case 3U:
 			{
-				Output[Index[1U]++] += static_cast<uint8_t>(StringIter);
+				Output[Index.at(1U)++] += static_cast<const uint8_t>(StringIter);
 			}
 		}
 	}
@@ -411,6 +451,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 	uint8_t Shift = 0, BitLength = 0;
 	uint64_t Mask = 0, Value = 0, BitQueue = 0;
 	HUFFMAN_NODE Huffman_Node;
+	memset(&Huffman_Node, 0, sizeof(Huffman_Node));
 	size_t _Produced = 0, _Consumed = 0;
 	if (!Produced)
 		Produced = &_Produced;
@@ -434,9 +475,9 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 			if (Buffer)
 			{
 				Shift = BitLength - BYTES_TO_BITS;
-				Mask = static_cast<uint64_t>(0xFF) << Shift;
+				Mask = static_cast<const uint64_t>(0xFF) << Shift;
 				Value = (BitQueue & Mask);
-				*Buffer = static_cast<uint8_t>(Value >> Shift);
+				*Buffer = static_cast<const uint8_t>(Value >> Shift);
 				++Buffer;
 				--Length;
 				BitQueue ^= Value;
@@ -453,8 +494,8 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanEncoding(
 		if (Buffer)
 		{
 			Shift = BYTES_TO_BITS - BitLength;
-			Mask = (1U << Shift) - 1U;
-			*Buffer = static_cast<uint8_t>((BitQueue << Shift) | Mask);
+			Mask = (static_cast<const uint64_t>(1U) << Shift) - 1U;
+			*Buffer = static_cast<const uint8_t>((BitQueue << Shift) | Mask);
 			++Buffer;
 			--Length;
 		}
@@ -489,8 +530,8 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 	else if (TargetBuffer && Length < 1U)
 		return HUFFMAN_RETURN_TYPE::ERROR_OVERFLOW;
 
-#define ZERO(TC)      static_cast<uint16_t>((TC) >> 16U)
-#define ONE(TC)       static_cast<uint16_t>((TC) & 0xFFFF)
+#define ZERO(TC)      static_cast<const uint16_t>((TC) >> 16U)
+#define ONE(TC)       static_cast<const uint16_t>((TC) & 0xFFFF)
 #define IS_INT(x)     (((x) & 0x8000) == 0x8000)
 #define VALUE_OF(x)   ((x) & 0x7FFF)
 
@@ -518,7 +559,7 @@ HUFFMAN_RETURN_TYPE HPACK_HuffmanDecoding(
 				else {
 					if (TargetBuffer)
 					{
-						*TargetBuffer = static_cast<uint8_t>(Temp);
+						*TargetBuffer = static_cast<const uint8_t>(Temp);
 						++TargetBuffer;
 						--Length;
 					}
@@ -561,7 +602,112 @@ Completed:
 	return HUFFMAN_RETURN_TYPE::NONE;
 }
 
-#if (defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
+//Generate random bytes to buffer
+void GenerateRandomBuffer(
+	void * const BufferPointer, 
+	const size_t BufferSize, 
+	const void *Distribution, 
+	const uint64_t Lower, 
+	const uint64_t Upper)
+{
+//Buffer check
+	if (BufferPointer == nullptr || BufferSize == 0)
+		return;
+//Clean buffer before generating.
+	else 
+		memset(BufferPointer, 0, BufferSize);
+
+//Fill size_t value.
+	if (BufferSize == sizeof(size_t) && (Distribution != nullptr || Lower + Upper > 0))
+	{
+		if (Distribution != nullptr)
+		{
+			*reinterpret_cast<size_t *>(BufferPointer) = (*const_cast<std::uniform_int_distribution<size_t> *>(reinterpret_cast<const std::uniform_int_distribution<size_t> *>(Distribution)))(*GlobalRunningStatus.RandomEngine);
+		}
+		else {
+			std::uniform_int_distribution<size_t> RandomDistribution(static_cast<const size_t>(Lower), static_cast<const size_t>(Upper));
+			*reinterpret_cast<size_t *>(BufferPointer) = RandomDistribution(*GlobalRunningStatus.RandomEngine);
+		}
+	}
+//Fill a 64 bits value.
+	else if (BufferSize == sizeof(uint64_t) && (Distribution != nullptr || Lower + Upper > 0))
+	{
+		if (Distribution != nullptr)
+		{
+			*reinterpret_cast<uint64_t *>(BufferPointer) = (*const_cast<std::uniform_int_distribution<uint64_t> *>(reinterpret_cast<const std::uniform_int_distribution<uint64_t> *>(Distribution)))(*GlobalRunningStatus.RandomEngine);
+		}
+		else {
+			std::uniform_int_distribution<uint64_t> RandomDistribution(Lower, Upper);
+			*reinterpret_cast<uint64_t *>(BufferPointer) = RandomDistribution(*GlobalRunningStatus.RandomEngine);
+		}
+	}
+//Fill a 32 bits value.
+	else if (BufferSize == sizeof(uint32_t) && (Distribution != nullptr || Lower + Upper > 0))
+	{
+		if (Distribution != nullptr)
+		{
+			*reinterpret_cast<uint32_t *>(BufferPointer) = (*const_cast<std::uniform_int_distribution<uint32_t> *>(reinterpret_cast<const std::uniform_int_distribution<uint32_t> *>(Distribution)))(*GlobalRunningStatus.RandomEngine);
+		}
+		else {
+			std::uniform_int_distribution<uint32_t> RandomDistribution(static_cast<const uint32_t>(Lower), static_cast<const uint32_t>(Upper));
+			*reinterpret_cast<uint32_t *>(BufferPointer) = RandomDistribution(*GlobalRunningStatus.RandomEngine);
+		}
+	}
+//Fill a 16 bits value.
+	else if (BufferSize == sizeof(uint16_t) && (Distribution != nullptr || Lower + Upper > 0))
+	{
+		if (Distribution != nullptr)
+		{
+			*reinterpret_cast<uint16_t *>(BufferPointer) = (*const_cast<std::uniform_int_distribution<uint16_t> *>(reinterpret_cast<const std::uniform_int_distribution<uint16_t> *>(Distribution)))(*GlobalRunningStatus.RandomEngine);
+		}
+		else {
+			std::uniform_int_distribution<uint16_t> RandomDistribution(static_cast<const uint16_t>(Lower), static_cast<const uint16_t>(Upper));
+			*reinterpret_cast<uint16_t *>(BufferPointer) = RandomDistribution(*GlobalRunningStatus.RandomEngine);
+		}
+	}
+//Fill a 8 bits value.
+	else if (BufferSize == sizeof(uint8_t) && (Distribution != nullptr || Lower + Upper > 0))
+	{
+		if (Distribution != nullptr)
+		{
+			*reinterpret_cast<uint8_t *>(BufferPointer) = static_cast<const uint8_t>((*const_cast<std::uniform_int_distribution<uint16_t> *>(reinterpret_cast<const std::uniform_int_distribution<uint16_t> *>(Distribution)))(*GlobalRunningStatus.RandomEngine));
+		}
+		else {
+			std::uniform_int_distribution<uint16_t> RandomDistribution(static_cast<const uint8_t>(Lower), static_cast<const uint8_t>(Upper));
+			*reinterpret_cast<uint8_t *>(BufferPointer) = static_cast<const uint8_t>(RandomDistribution(*GlobalRunningStatus.RandomEngine));
+		}
+	}
+//Fill a random sequence.
+	else {
+	#if defined(ENABLE_LIBSODIUM)
+	//Generate a random sequence by LibSodium.
+		for (size_t Index = 0;Index < LOOP_MAX_LARGE_TIMES;++Index)
+		{
+		//Generate a random 32 bits or sequence.
+			if (BufferSize == sizeof(uint32_t))
+				*reinterpret_cast<uint32_t *>(BufferPointer) = randombytes_random();
+			else 
+				randombytes_buf(BufferPointer, BufferSize);
+
+		//Must not a empty buffer after generating.
+			if (!CheckEmptyBuffer(BufferPointer, BufferSize))
+				return;
+		}
+	#endif
+
+	//Generate a random sequence by C++ STL.
+		if (CheckEmptyBuffer(BufferPointer, BufferSize))
+		{
+			std::uniform_int_distribution<uint16_t> RandomDistribution(1U, UINT8_MAX); //Not including empty bytes.
+			for (size_t Index = 0;Index < BufferSize;Index += sizeof(uint8_t))
+				*(reinterpret_cast<uint8_t *>(BufferPointer) + Index * sizeof(uint8_t)) = static_cast<const uint8_t>(RandomDistribution(*GlobalRunningStatus.RandomEngine));
+		}
+	}
+
+	return;
+}
+
+#if (defined(PLATFORM_FREEBSD) || defined(PLATFORM_LINUX) || defined(PLATFORM_MACOS))
 //Increase time with milliseconds
 uint64_t IncreaseMillisecondTime(
 	const uint64_t CurrentTime, 

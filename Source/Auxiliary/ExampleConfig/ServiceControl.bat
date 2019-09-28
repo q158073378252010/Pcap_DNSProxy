@@ -1,16 +1,16 @@
 :: Pcap_DNSProxy service control batch
 :: Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap
-:: 
-:: Author: Hugo Chan, Syrone Wong, Chengr28
-:: 
+::
+:: Author: Hugo Chan, Syrone Wong, Stzx, Chengr28
+::
 
-
+@chcp 65001
 @echo off
 
 
 :: Administrative permission check
-net session >NUL 2>NUL
-if ERRORLEVEL 1 (
+net session >nul 2>nul
+IF ERRORLEVEL 1 (
 	color 4F
 	echo Please run as Administrator.
 	echo.
@@ -21,21 +21,22 @@ if ERRORLEVEL 1 (
 
 
 :: Processor architecture and system version check
-set Arch=
-if %PROCESSOR_ARCHITECTURE%%PROCESSOR_ARCHITEW6432% == x86 (
-	set Arch=_x86
+set Architecture=
+IF %PROCESSOR_ARCHITECTURE%%PROCESSOR_ARCHITEW6432% == x86 (
+	set Architecture=_x86
 )
-ver | findstr /L /I " 5." >NUL
-if not ERRORLEVEL 1 (
-	set Arch=_XP
+ver | findstr /L /I " 5." >nul
+IF NOT ERRORLEVEL 1 (
+	set Architecture=_XP
 )
-set Prog=Pcap_DNSProxy%Arch%.exe
+set Executable=Pcap_DNSProxy%Architecture%.exe
+set ServiceName=PcapDNSProxyService
 
 
 :: Command
 set Command=%~1
-if not "%Command%" == "" (
-	goto CASE_%Command%
+IF NOT "%Command%" == "" (
+	GOTO CASE_%Command%
 )
 
 
@@ -48,144 +49,145 @@ echo 2: Uninstall service
 echo 3: Start service
 echo 4: Stop service
 echo 5: Restart service
-echo 6: Flush DNS cache in Pcap_DNSProxy
-echo 7: Flush DNS cache in system only
+echo 6: Flush domain cache in Pcap_DNSProxy
+echo 7: Flush domain cache in system only
 echo 8: Exit
 echo.
 set /P UserChoice="Choose: "
 set UserChoice=CASE_%UserChoice%
 cd /D "%~dp0"
 cls
-goto %UserChoice%
+GOTO %UserChoice%
 
 
 :: Service install
 :CASE_1
-	sc stop PcapDNSProxyService
-	sc delete PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
-	taskkill /F /IM Pcap_DNSProxy.exe >NUL
-	ping 127.0.0.1 -n 3 >NUL
-	sc create PcapDNSProxyService binPath= "%~dp0%Prog%" DisplayName= "PcapDNSProxy Service" start= auto
-	%Prog% --first-setup
-	sc description PcapDNSProxyService "Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap"
-	sc failure PcapDNSProxyService reset= 0 actions= restart/5000/restart/10000//
-	sc start PcapDNSProxyService
-	ipconfig /flushdns
-	call :CHECK_PROG
-	if "%Command%" == "" (
+	CALL :DELETE_SERVICE
+	ping 127.0.0.1 -n 3 >nul
+	CALL :KILL_PROCESS
+	ping 127.0.0.1 -n 3 >nul
+	sc create %ServiceName% binPath= "%~dp0%Executable%" DisplayName= "PcapDNSProxy Service" start= auto
+	%Executable% --first-setup
+	sc description %ServiceName% "Pcap_DNSProxy, a local DNS server based on WinPcap and LibPcap"
+	sc failure %ServiceName% reset= 0 actions= restart/5000/restart/10000//
+	sc start %ServiceName%
+	IF %ERRORLEVEL% EQU 0 (
+		ipconfig /flushdns
+	)
+	CALL :CHECK_PROCESS
+	IF "%Command%" == "" (
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
 :: Service uninstall
 :CASE_2
-	sc stop PcapDNSProxyService
-	sc delete PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
-	taskkill /F /IM Pcap_DNSProxy.exe >NUL
+	CALL :DELETE_SERVICE
+	ping 127.0.0.1 -n 3 >nul
+	CALL :KILL_PROCESS
 	ipconfig /flushdns
-	if "%Command%" == "" (
+	IF "%Command%" == "" (
 		echo.
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
 :: Service start
 :CASE_3
-	sc start PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
-	ipconfig /flushdns
-	ping 127.0.0.1 -n 3 >NUL
-	call :CHECK_PROG
-	if "%Command%" == "" (
+	sc query %ServiceName% >nul
+	IF %ERRORLEVEL% EQU 0 (
+		CALL :START_SERVICE
+	) ELSE (
+		color 4F
+		echo Service not installed.
+		echo.
+	)
+	IF "%Command%" == "" (
 		pause
+		color 07
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
 :: Service stop
 :CASE_4
-	sc stop PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
+	CALL :STOP_SERVICE
+	ping 127.0.0.1 -n 3 >nul
 	ipconfig /flushdns
-	if "%Command%" == "" (
+	IF "%Command%" == "" (
 		echo.
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
 :: Service restart
 :CASE_5
-	sc stop PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
-	taskkill /F /IM Pcap_DNSProxy.exe >NUL
-	ping 127.0.0.1 -n 3 >NUL
-	sc start PcapDNSProxyService
-	ping 127.0.0.1 -n 3 >NUL
-	ipconfig /flushdns
-	call :CHECK_PROG
-	if "%Command%" == "" (
+	CALL :STOP_SERVICE
+	ping 127.0.0.1 -n 3 >nul
+	CALL :KILL_PROCESS
+	ping 127.0.0.1 -n 3 >nul
+	CALL :START_SERVICE
+	IF "%Command%" == "" (
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
-:: Flush DNS cache(Pcap_DNSProxy)
+:: Flush domain cache(Pcap_DNSProxy)
 :CASE_6
-	call :CHECK_PROG
-	%Prog% --flush-dns
-	if "%Command%" == "" (
+	CALL :CHECK_PROCESS
+	%Executable% --flush-dns
+	IF "%Command%" == "" (
 		echo.
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
-:: Flush DNS cache(System)
+:: Flush domain cache(System)
 :CASE_7
 	ipconfig /flushdns
-	if "%Command%" == "" (
+	IF "%Command%" == "" (
 		echo.
 		pause
 		cls
-		goto :CHOICE
-	) else (
-		exit
+		GOTO :CHOICE
+	) ELSE (
+		EXIT
 	)
 
 
 :: Exit
 :CASE_8
 	color
-	exit
+	EXIT
 
 
 :: Process check
-:CHECK_PROG
-	tasklist | findstr /L /I "%Prog%" >NUL
-	if ERRORLEVEL 1 (
+:CHECK_PROCESS
+	tasklist | findstr /L /I "%Executable%" >nul
+	IF %ERRORLEVEL% NEQ 0 (
 		color 4F
 		echo.
 		echo The program is not running, please check the configurations and error log.
@@ -193,6 +195,37 @@ goto %UserChoice%
 		pause
 		color 07
 		cls
-		goto :CHOICE
+		GOTO :CHOICE
 	)
 	echo.
+GOTO :EOF
+
+
+:: Process kill
+:KILL_PROCESS
+	tasklist | findstr /L /I "%Executable%" >nul && taskkill /F /IM %Executable% >nul
+GOTO :EOF
+
+
+:: Service start
+:START_SERVICE
+	sc query %ServiceName% >nul && ( sc query %ServiceName% | find "RUNNING" >nul || sc start %ServiceName% )
+	IF %ERRORLEVEL% EQU 0 (
+		ping 127.0.0.1 -n 3 >nul
+		ipconfig /flushdns
+		ping 127.0.0.1 -n 3 >nul
+		CALL :CHECK_PROCESS
+	)
+GOTO :EOF
+
+
+:: Service stop
+:STOP_SERVICE
+	sc query %ServiceName% >nul && ( sc query %ServiceName% | find "STOPPED" >nul || sc stop %ServiceName% )
+GOTO :EOF
+
+
+:: Service delete
+:DELETE_SERVICE
+	sc query %ServiceName% >nul && ( sc query %ServiceName% | find "STOPPED" >nul || sc stop %ServiceName% ) && sc delete %ServiceName%
+GOTO :EOF

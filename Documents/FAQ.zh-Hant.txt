@@ -6,80 +6,18 @@
 -------------------------------------------------------------------------------
 
 
-* WinPcap 提示已安裝舊版本無法繼續：
-  * 到安裝和卸載程式、運行功能表或 %PROGRAMFILES(x86)% (64位系統)/%PROGRAMFILES% (32位系統) 尋找 WinPcap 的卸載程式
-  * 如果找不到卸載程式，則可能需要進入安全模式刪除 WinPcap 的所有檔然後重新安裝：
-    * %WINDIR%\system32\Packet.dll
-    * %WINDIR%\system32\drivers\npf.sys
-    * %WINDIR%\system32\WanPacket.dll
-    * %WINDIR%\system32\wpcap.dll
-    * %WINDIR%\system32\pthreadVC.dll
-
-* 安裝、運行或重啟服務時出現：
-  * 服務沒有及時回應啟動或控制請求 - 請檢查是否有錯誤報表生成，詳細情況參見下文 Error.log 詳細錯誤報表 一節
-  * Service start failed, please check the configuration. - 請檢查是否有錯誤報表生成，詳細情況參見下文 Error.log 詳細錯誤報表 一節
-
-* 偵錯模式
-  * 當有任何懷疑程式工作不正常或者出錯的情況，可繞過服務控制程式直接使用程式的偵錯模式進行調試，所有錯誤都將直接輸出到螢幕上
-  * 終止所有正在運行的實例，確定同一時間只能有一個程式正在運行中
-  * Windows
-    * 直接以管理員許可權運行 exe 即可
-  * Linux
-    * 以 root 許可權運行 ./Pcap_DNSProxy --disable-daemon
-  * macOS
-    * 以 root 許可權運行 ./Pcap_DNSProxy
-
-* 如果出現以下結果，則說明服務沒有運行成功或者設置出錯，請檢查是否有錯誤報表生成，或請移步 ReadMe 文檔中 安裝方法 一節
-
-   >nslookup www.google.com
-    ..
-    伺服器:  UnKnown
-    Address: ::1（視所在網路環境而定，本地監聽協定為 IPv4 時為 127.0.0.1）
-
-    *** UnKnown 找不到 www.google.com: No response from server
-
-
--------------------------------------------------------------------------------
-
-
-* 如果出現以下結果，則說明服務已經運行成功但遠端DNS伺服器沒有回應，請檢查是否有錯誤報表生成
-  * 請務必設置一個正確的、有效的、可以使用的境外DNS伺服器
-  * 出現這種情況可能為網路問題。部分地區ISP/運營商對UDP協定轉發丟包率比較高，可嘗試切換到 TCP 協定模式（參見 ReadMe 文檔中 設定檔詳細參數說明 中 Base 基本區域 的 Operation Mode 一節）或者多嘗試請求幾次
-  * 可嘗試重啟服務（參見 ReadMe 文檔中的 重啟服務）
-
-   >nslookup www.google.com
-    伺服器: pcap-dnsproxy.server（視設定檔設置的值而定，參見 ReadMe 文檔中 設定檔詳細參數說明）
-    Address: ::1（視所在網路環境而定，本地監聽協定為 IPv4 時為 127.0.0.1）
-
-    DNS request timed out.
-        timeout was 2 seconds.
-    DNS request timed out.
-        timeout was 2 seconds.
-    DNS request timed out.
-        timeout was 2 seconds.
-    DNS request timed out.
-        timeout was 2 seconds.
-    *** 請求 pcap-dnsproxy.server 超時（視設定檔設置的值而定，參見 ReadMe 文檔中 設定檔詳細參數說明）
-
-   >nslookup -vc www.google.com
-    伺服器:  pcap-dnsproxy.server（視設定檔設置的值而定，參見 ReadMe 文檔中 設定檔詳細參數說明）
-    Address: ::1（視所在網路環境而定，本地監聽協定為 IPv4 時為 127.0.0.1）
-
-    *** 沒有 www.google.com 可以使用的 internal type for both IPv4 and IPv6 Addresses (A+AAAA) 記錄
-
-
--------------------------------------------------------------------------------
-
-
 當程式運行時發生錯誤，可能會建置錯誤報告也就是 Error.log 檔，其位於工具服務註冊的目錄內，對解決問題至關重要
 * 錯誤報表的格式為 "[日期 時間] -> [錯誤類型] 對錯誤代碼的簡單介紹[錯誤代碼] in 錯誤出處(Line 行數)."（不含雙引號）
 * Windows 的錯誤代碼參見 https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381(v=vs.85).aspx
-* Linux/macOS 的錯誤代碼參見 http://man7.org/linux/man-pages/man3/errno.3.html
+* FreeBSD/Linux/macOS 的錯誤代碼參見 http://man7.org/linux/man-pages/man3/errno.3.html
 * WinPcap/LibPcap 錯誤資訊的具體含義可移步 https://www.winpcap.org/docs/docs_40_2/html/group__wpcapfunc.html
 * Winsock 錯誤代碼具體含義可移步 https://msdn.microsoft.com/en-us/library/windows/desktop/ms740668(v=vs.85).aspx
 * HTTP 狀態碼具體含義可移步 https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
 * SSPI/SChannel 錯誤代碼具體含義可移步 https://msdn.microsoft.com/en-us/library/windows/desktop/aa380499(v=vs.85).aspx 和 https://msdn.microsoft.com/en-us/library/windows/desktop/dd721886(v=vs.85).aspx
 * OpenSSL 錯誤代碼具體含義可移步 https://www.openssl.org/docs/manmaster/man3/ERR_get_error.html
+
+
+-------------------------------------------------------------------------------
 
 
 Error.log 詳細錯誤報表：
@@ -89,20 +27,20 @@ Error.log 詳細錯誤報表：
   * Capture module Monitor terminated - 抓包模組已經停止運行：建議重新開機服務或程式
   * Commands error - 程式啟動參數錯誤：請檢查為程式傳入的參數
   * Convert multiple byte or wide char string error - 多/寬位元組字元轉換錯誤：建議重新開機服務或程式
-  * Create FIFO error - FIFO 創建錯誤：建議重新開機服務或程式
+  * Create FIFO pipe error - FIFO 管道創建錯誤：建議重新開機服務或程式
   * Create mailslot error - Mailslot 創建錯誤：建議重新開機服務或程式
   * DNSCurve TCP Signature Request module Monitor terminated - DNSCurve TCP 協定握手資訊獲取模組已經停止運行：建議重新開機服務或程式
   * DNSCurve UDP Signature Request module Monitor terminated - DNSCurve UDP 協定握手資訊獲取模組已經停止運行：建議重新開機服務或程式
   * Domain Test module Monitor terminated - 網域名稱測試模組已經停止運行：建議重新開機服務或程式
-  * FIFO read messages error - FIFO 讀取資訊錯誤：建議重新開機服務或程式
-  * FIFO module Monitor terminated - FIFO 監視模組已經停止運行：建議重新開機服務或程式
-  * FIFO write messages error - FIFO 寫入資訊錯誤：建議重新開機服務或程式
+  * FIFO pipe read messages error - FIFO 讀取資訊錯誤：建議重新開機服務或程式
+  * FIFO pipe module listener terminated - FIFO 監視模組已經停止運行：建議重新開機服務或程式
+  * FIFO pipe write messages error - FIFO 寫入資訊錯誤：建議重新開機服務或程式
   * Get Local Address Information module Monitor terminated - 本地位址監視模組已經停止監視：建議重新開機服務或程式
   * Handle system signals error - 設置系統信號處理函數錯誤：建議重新開機服務或程式
   * ICMP Test module Monitor terminated - ICMP 請求模組已經停止請求：建議重新開機服務或程式
   * Ignore system signal error - 設置忽略系統部分信號錯誤：建議重新開機服務或程式
   * Mailslot read messages error - Mailslot 讀取資訊錯誤：建議重新開機服務或程式
-  * Mailslot module Monitor terminated - Mailslot 監視模組已經停止運行：建議重新開機服務或程式
+  * Mailslot module listener terminated - Mailslot 監視模組已經停止運行：建議重新開機服務或程式
   * Mailslot write messages error - Mailslot 寫入資訊錯誤：建議重新開機服務或程式
   * Process already exists error - 進程已經存在：請確認只有一個本程式實例運行中
   * Read Hosts module Monitor terminated - Hosts 讀取模組已經停止監視：建議重新開機服務或程式
@@ -196,8 +134,10 @@ Error.log 詳細錯誤報表：
   * HTTP CONNECT connecting error - HTTP CONNECT 協定連接錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
   * HTTP CONNECT request error - HTTP CONNECT 協定請求錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
   * HTTP CONNECT socket initialization error - HTTP CONNECT 協定請求通訊端初始化錯誤：具體原因可參見錯誤代碼
-  * ICMP Test event initialization error - ICMP 協定事件模組初始化錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
-  * ICMP Test event error - ICMP 協定事件模組錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
+  * ICMP Test event initialization error - ICMP 協定測試事件模組初始化錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
+  * ICMP Test event error - ICMP 協定測試事件模組錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
+  * Domain Test event initialization error - 網域名稱測試事件模組初始化錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
+  * Domain Test event error - 網域名稱測試事件模組錯誤：可能為網路錯誤，具體原因可參見錯誤代碼
   * No any available gateways to external network - 沒有任何通往外部網路的可用閘道：可能為網路錯誤，請檢查網路是否通暢
   * Socket Do Not Fragment flag settings error - 設置 IPv4 Do Not Fragment 標誌錯誤：具體原因可參見錯誤代碼
   * Socket Hop Limits settings error - 設置 Hop Limits/TTL 錯誤：具體原因可參見錯誤代碼

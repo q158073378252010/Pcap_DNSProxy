@@ -23,13 +23,10 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * LibEvent
     * LibPcap
       * 编译时如果剥离 LibPcap 的依赖则可跳过编译和安装下表的依赖库和工具，具体参见下文的介绍，不建议使用
-      * 部分 Linux 发行版可能还需要 libpcap-dev 工具的支持，以及运行 ldconfig 刷新系统库缓存
     * Libsodium
       * 编译时如果剥离 Libsodium 的依赖则可跳过编译和安装下表的依赖库和工具，具体参见下文的介绍，不建议使用
-      * 部分 Linux 发行版可能还需要 libsodium-dev 工具的支持，以及运行 ldconfig 刷新系统库缓存
     * OpenSSL
       * 编译时如果剥离 OpenSSL 的依赖则可跳过编译和安装下表的依赖库和工具，具体参见下文的介绍，不建议使用
-      * 部分 Linux 发行版可能还需要 libssl-dev/openssl-dev 工具的支持，以及运行 ldconfig 刷新系统库缓存
 
 2.编译 Pcap_DNSProxy 程序并配置程序属性
   * 使用终端进入 Source/Auxiliary/Scripts 目录，使用 chmod 755 CMake_Build.sh 使脚本获得执行权限
@@ -47,7 +44,6 @@ https://sourceforge.net/projects/pcap-dnsproxy
     * 附带的 Linux_Install.Systemd.sh 脚本适用于默认使用 Systemd Init 的系统
       * Linux Debian 8.x 官方发行版以及更新版本系统环境，经测试可直接使用
     * 附带的 Linux_Install.SysV.sh 脚本适用于默认使用 System V Init 的系统
-      * Linux Debian 6.x - 7.x 官方发行版系统环境，经测试可直接使用
     * 更多详情可参见下文其它 Linux 发行版服务的说明，以及所使用 Linux 发行版的官方说明
   * 使用 Systemd Init 时：
     * 进入 Release 目录并编辑 Pcap_DNSProxy.service 文件，编辑完成后保存： 
@@ -117,7 +113,22 @@ https://sourceforge.net/projects/pcap-dnsproxy
   3.也可以先 service PcapDNSProxyService stop 停止服务，稍等一段时间再 service PcapDNSProxyService start 启动服务即可
 
 
-更新程序方法（切勿直接覆盖，否则可能会造成不可预料的错误）：
+小更新的方法（需要以管理员身份进行，如果配置文件的 Version 有更新需要进行大更新）：
+* Systemd 部分：
+  1.打开终端，使用 su 获得 root 权限
+  2.使用 systemctl stop Pcap_DNSProxy 停止服务
+  3.将目录内的所有可执行文件删除
+  4.将新版本的 Pcap_DNSProxy 的所有可执行文件解压到相同位置
+  5.使用 systemctl start Pcap_DNSProxy 启动服务
+* SysV 部分：
+  1.打开终端，使用 su 获得 root 权限
+  2.使用 service PcapDNSProxyService stop 停止服务
+  3.将目录内的所有可执行文件删除
+  4.将新版本的 Pcap_DNSProxy 的所有可执行文件解压到相同位置
+  5.使用 service PcapDNSProxyService start 启动服务
+
+
+大更新的方法（需要以管理员身份进行，切勿直接覆盖，否则可能会造成不可预料的错误）：
 * Systemd 部分：
   1.打开终端，使用 su 获得 root 权限并进入 Release 目录内
   2.使用 ./Linux_Uninstall.Systemd.sh 执行服务卸载脚本
@@ -178,7 +189,6 @@ https://sourceforge.net/projects/pcap-dnsproxy
 
 * Linux Debian 系列：
   * 官方发行版 8.x 以及更新版本默认需要使用 Systemd 管理系统服务
-  * 官方发行版 6.x - 7.x 版本默认需要使用 insserv 管理系统服务
 * Linux Red Hat 和 openSUSE 系列：
   * 使用 chkconfig 管理系统服务
   * 参见 https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/s2-services-chkconfig.html
